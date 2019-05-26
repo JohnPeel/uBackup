@@ -23,22 +23,29 @@ mod settings;
 pub use settings::{AppConfig, Settings};
 
 use std::collections::VecDeque;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 fn get_current_drive() -> Option<String> {
     match std::env::current_dir() {
-        Ok(path) => match path.components().next().unwrap() {
-            Component::RootDir => return Some("/".to_owned()),
-            Component::Prefix(path) => {
-                let mut path = path.as_os_str().to_str().unwrap().to_owned();
-                if !path.ends_with('\\') {
-                    path = path + "\\"
+        Ok(path) => {
+            let mut components = path.components();
+            let mut path = PathBuf::new();
+
+            while !path.ends_with(std::path::MAIN_SEPARATOR.to_string()) {
+                match components.next() {
+                    Some(component) => match component {
+                        Component::RootDir => path.push(std::path::MAIN_SEPARATOR.to_string()),
+                        Component::Prefix(prefix) => path.push(prefix.as_os_str()),
+                        _ => {}
+                    },
+                    None => return None,
                 }
-                return Some(path);
             }
-            _ => {}
-        },
+
+            return Some(path.to_string_lossy().into_owned());
+        }
         _ => {}
     }
     return None;
@@ -241,7 +248,7 @@ fn glob(
                 }
 
                 filters.push_front(settings::Match { exclude, only });
-                parts_remaining.push_front(Component::Normal(std::ffi::OsStr::new("*")));
+                parts_remaining.push_front(Component::Normal(OsStr::new("*")));
             } else {
                 current_path.push(path);
             }
